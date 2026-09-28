@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import OpenAI from 'openai';
 import { Temporal } from '@js-temporal/polyfill';
-import { createSummaryOutput, SUMMARY_PROMPT, SummaryTooLongError, type Generate } from '../src/llm.js';
+import { createSummaryOutput, SUMMARY_PROMPT, countSummaryChars, type Generate } from '../src/llm.js';
 import { loadLlmConfig } from '../src/config.js';
 
 const time = Temporal.Instant.from('2026-09-26T16:00:00Z');
@@ -88,13 +88,31 @@ test('400文字はそのまま、401文字は1回だけ再要約する（ヘッ�
   }
 });
 
-test('再要約も上限超過なら切断も追加生成もせず投稿可能な本文を返さない', async () => {
+test('再要約も超過なら警告だけ出し、改行も本文もそのまま採用する', async t => {
   let calls = 0;
-  await assert.rejects(createSummaryOutput(sources, time, 'Asia/Tokyo', {
+  const warnings: string[] = [];
+  t.mock.method(console, 'warn', (message: string) => warnings.push(message));
+  const shortened = 'あ'.repeat(200) + '\r\n\n' + 'い'.repeat(227);
+  const output = await createSummaryOutput(sources, time, 'Asia/Tokyo', {
     loadConfig: () => config,
-    generate: async () => { calls++; return ok('あ'.repeat(401)); },
-  }), SummaryTooLongError);
+    generate: async () => { calls++; return ok(calls === 1 ? 'あ'.repeat(500) : shortened); },
+  });
   assert.equal(calls, 2);
+  assert.equal(output, `【2026-09-27 本日の要約】\n\n${shortened}`);
+  assert.deepEqual(warnings, ['Warning: summary still exceeds 400 characters after shortening (427 chars). Using it as-is.']);
+});
+
+test('CR/LFを数えず400文字なら初回結果の改行を維持して採用する', async () => {
+  const body = 'あ'.repeat(200) + '\r\n\n\r' + 'い'.repeat(200);
+  assert.equal(countSummaryChars(body), 400);
+  assert.equal(countSummaryChars('a b\t\r\n'), 4);
+  let calls = 0;
+  const output = await createSummaryOutput(sources, time, 'Asia/Tokyo', {
+    loadConfig: () => config,
+    generate: async () => { calls++; return ok(body); },
+  });
+  assert.equal(calls, 1);
+  assert.equal(output, `【2026-09-27 本日の要約】\n\n${body}`);
 });
 
 test('再要約の空応答もエラーにする', async () => {

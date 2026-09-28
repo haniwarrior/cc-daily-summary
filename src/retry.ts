@@ -1,4 +1,3 @@
-import { SummaryTooLongError } from './llm.js';
 import OpenAI from 'openai';
 import { ServerOfflineError, TimeoutError, NetworkError, PermissionError, NotFoundError } from '@concrnt/client';
 
@@ -28,7 +27,6 @@ export function retryable(error: unknown): boolean {
 
 // 外部エラーのmessage/bodyには秘密情報が含まれ得るので、そのままログにしない。
 export function errorLabel(error: unknown): string {
-  if (error instanceof SummaryTooLongError) return error.message;
   if (error instanceof Error && error.cause) return errorLabel(error.cause);
   if (error instanceof OpenAI.APIError) return `OpenAI API error (HTTP ${error.status ?? 'connection/timeout'})`;
   if (error instanceof HttpError) return error.message;

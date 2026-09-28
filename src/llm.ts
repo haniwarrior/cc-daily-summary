@@ -4,9 +4,7 @@ import { loadLlmConfig, type LlmConfig } from './config.js';
 import type { SummarySource } from './summary.js';
 
 export const MAX_SUMMARY_LENGTH = 400;
-export class SummaryTooLongError extends Error {
-  constructor() { super('再要約後も本文が400文字を超えたため、投稿を中止しました。'); }
-}
+export const countSummaryChars = (text: string): number => text.replace(/[\r\n]/g, "").length;
 
 export const SUMMARY_PROMPT = `あなたはSNS投稿を日本語で簡潔に要約する編集者です。
 入力JSONのpostsは、ある投稿者の当日投稿を時系列順に並べた資料です。
@@ -18,7 +16,8 @@ export const SUMMARY_PROMPT = `あなたはSNS投稿を日本語で簡潔に要�
 - 元投稿のニュアンス、希望と事実、冗談と断定の違いを大きく変えない。
 - 時系列が重要な場合はその順序や変化を維持する。
 - 「このユーザーは」など同じ主語を繰り返さず、自然な日本語にする。
-- 要約本文は最大400文字以内に収める。400文字は目標値ではなく上限。
+- 話題や内容のまとまりが変わる箇所で自然に改行し、読みやすい段落構成にする。過剰に細かく改行しない。
+- 要約本文は改行コード（CR・LF）を除いて原則最大400文字以内に収める。400文字を目標値にはしない。
 - 内容が少ない場合は無理に400文字近くまで増やさない。
 - 内容が多い場合は重要な内容を優先し、重要度の低い細かな内容は適宜省略する。
 - 無理に情報を詰め込まず、日本語として自然な文章を優先する。
@@ -49,37 +48,40 @@ export async function summarizePosts(
   });
   const invoke = generate ?? (params => client!.responses.create(params));
   async function requestBody(request: OpenAI.Responses.ResponseCreateParamsNonStreaming): Promise<string> {
-  let response: ResponseResult;
-  try {
-    response = await invoke(request);
-  } catch (error) {
-    if (error instanceof OpenAI.APIError) {
-      const hint = error.status === 401 ? 'OPENAI_API_KEYを確認してください。'
-        : error.status === 429 ? '利用上限・残高・レート制限を確認してください。'
-        : error.status === 400 ? '入力サイズまたはモデルの対応パラメーターを確認してください。'
-        : error.status === 404 ? 'OPENAI_MODELとモデルへのアクセス権を確認してください。'
-        : 'ネットワークまたはAPIの稼働状況を確認してください。';
-      throw new Error(`LLM APIへの接続・要約に失敗しました${error.status ? ` (HTTP ${error.status})` : ''}。${hint}`, { cause: error });
+    let response: ResponseResult;
+    try {
+      response = await invoke(request);
+    } catch (error) {
+      if (error instanceof OpenAI.APIError) {
+        const hint = error.status === 401 ? 'OPENAI_API_KEYを確認してください。'
+          : error.status === 429 ? '利用上限・残高・レート制限を確認してください。'
+          : error.status === 400 ? '入力サイズまたはモデルの対応パラメーターを確認してください。'
+          : error.status === 404 ? 'OPENAI_MODELとモデルへのアクセス権を確認してください。'
+          : 'ネットワークまたはAPIの稼働状況を確認してください。';
+        throw new Error(`LLM APIへの接続・要約に失敗しました${error.status ? ` (HTTP ${error.status})` : ''}。${hint}`, { cause: error });
+      }
+      throw new Error('LLM APIの呼び出しに失敗しました。接続と設定を確認してください。', { cause: error });
     }
-    throw new Error('LLM APIの呼び出しに失敗しました。接続と設定を確認してください。', { cause: error });
-  }
-  if (response.status !== 'completed') throw new Error('LLMの要約が完了しませんでした。出力上限等を確認してください。');
-  if (response.output.some(item => item.type === 'message' && item.content.some(part => part.type === 'refusal'))) {
-    throw new Error('LLMが要約の生成を拒否しました。');
-  }
-  const body = response.output_text.trim();
-  if (!body) throw new Error('LLMから要約本文が返りませんでした。');
+    if (response.status !== 'completed') throw new Error('LLMの要約が完了しませんでした。出力上限等を確認してください。');
+    if (response.output.some(item => item.type === 'message' && item.content.some(part => part.type === 'refusal'))) {
+      throw new Error('LLMが要約の生成を拒否しました。');
+    }
+    const body = response.output_text.trim();
+    if (!body) throw new Error('LLMから要約本文が返りませんでした。');
     return body;
   }
   let body = await requestBody(request);
-  // ヘッダーを除く本文のUTF-16コード単位数（String.length）。絵文字も保守的に数える。
-  if (body.length > MAX_SUMMARY_LENGTH) {
+  // ヘッダーとCR/LFを除く本文のUTF-16コード単位数。本文中の改行は保持する。
+  if (countSummaryChars(body) > MAX_SUMMARY_LENGTH) {
     body = await requestBody({
       ...request,
-      instructions: `${SUMMARY_PROMPT}\n今回は入力JSONのsummaryを短縮してください。以下の要約を、内容をできるだけ維持したまま自然な日本語で400文字以内に短縮してください。新しい情報は追加せず、第三者視点・ですます調を維持し、短縮した本文だけを返してください。`,
+      instructions: `${SUMMARY_PROMPT}\n今回は入力JSONのsummaryを短縮してください。以下の要約を、内容と自然な文章をできるだけ維持しながら、改行を除いて400文字以内に短縮してください。読みやすさのための改行は残して構いません。重要な内容を優先し、細かな内容は適宜省略してください。新しい情報は追加せず、第三者視点・ですます調を維持し、短縮した本文だけを返してください。`,
       input: JSON.stringify({ ...context, summary: body }),
     });
-    if (body.length > MAX_SUMMARY_LENGTH) throw new SummaryTooLongError();
+    const length = countSummaryChars(body);
+    if (length > MAX_SUMMARY_LENGTH) {
+      console.warn(`Warning: summary still exceeds 400 characters after shortening (${length} chars). Using it as-is.`);
+    }
   }
   return body;
 }
