@@ -15,7 +15,7 @@ import { runDailyJob } from '../src/job.js';
 const ccid = `con1${'a'.repeat(38)}`;
 const env = { CONCRNT_SUBKEY: `concrnt-subkey ${'1'.repeat(64)} ${ccid}@example.com`,
   CONCRNT_HOST: 'example.com', POST_TIMELINE: '', POST_TIME: '23:50', TIMEZONE: 'Asia/Tokyo',
-  OPENAI_API_KEY: 'test-only', OPENAI_MODEL: 'test-model', RETRY_INTERVAL_SECONDS: '60', MAX_RETRIES: '3' };
+  OPENAI_API_KEY: 'test-only', OPENAI_MODEL: 'test-model', SUMMARY_MAX_CHARS: '400', RETRY_INTERVAL_SECONDS: '60', MAX_RETRIES: '3' };
 function config(overrides: Record<string, string> = {}) {
   const path = join(mkdtempSync(join(tmpdir(), 'concrnt-config-')), '.env');
   writeFileSync(path, Object.entries({ ...env, ...overrides }).map(([k,v]) => `${k}=${v}`).join('\n'));
@@ -29,7 +29,7 @@ test('全設定を接続前に検証、CCIDはsubkeyからのみ取得', () => {
   assert.equal(settings.maxRetries, 3);
   for (const [key, values] of Object.entries({ CONCRNT_SUBKEY: ['', 'invalid'], CONCRNT_HOST: ['', 'https://example.com'],
     POST_TIME: ['1:23', '24:00', '23:60', 'no'], TIMEZONE: ['', '+09:00', 'unknown'],
-    OPENAI_API_KEY: [''], OPENAI_MODEL: [''], RETRY_INTERVAL_SECONDS: ['0', '-1', '1.5', 'NaN'], MAX_RETRIES: ['-1', '1.5'] })) {
+    SUMMARY_MAX_CHARS: ['', '0', '-1', '1.5', 'NaN', 'Infinity', '1e3', '9007199254740992'], OPENAI_API_KEY: [''], OPENAI_MODEL: [''], RETRY_INTERVAL_SECONDS: ['0', '-1', '1.5', 'NaN'], MAX_RETRIES: ['-1', '1.5'] })) {
     for (const value of values) assert.throws(() => config({ [key]: value }), new RegExp(key));
   }
   assert.equal(config({ MAX_RETRIES: '0' }).maxRetries, 0);

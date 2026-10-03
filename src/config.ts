@@ -21,7 +21,7 @@ function readEnv(path = fileURLToPath(new URL('../.env', import.meta.url))) {
   return parse(source);
 }
 
-export interface LlmConfig { apiKey: string; model: string }
+export interface LlmConfig { apiKey: string; model: string; summaryMaxChars: number }
 
 export function parsePostTimelines(value?: string): string[] {
   const timelines = [...new Set((value ?? '').split(',').map(item => item.trim()).filter(Boolean))];
@@ -44,7 +44,12 @@ export function loadLlmConfig(path?: string): LlmConfig {
   if (!apiKey) throw new Error('.env に OPENAI_API_KEY を設定してください。');
   const model = env.OPENAI_MODEL?.trim();
   if (!model) throw new Error('.env に OPENAI_MODEL を設定してください。');
-  return { apiKey, model };
+  const value = env.SUMMARY_MAX_CHARS?.trim() ?? '';
+  const summaryMaxChars = Number(value);
+  if (!/^\d+$/.test(value) || !Number.isSafeInteger(summaryMaxChars) || summaryMaxChars <= 0) {
+    throw new Error('SUMMARY_MAX_CHARS は正の整数（JavaScriptの安全な整数範囲内）で指定してください。');
+  }
+  return { apiKey, model, summaryMaxChars };
 }
 
 export function loadConfig(path?: string): Config {
