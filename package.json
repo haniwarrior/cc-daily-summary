@@ -13,8 +13,8 @@
     "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
-    "@concrnt/client": "2.0.5",
-    "@concrnt/worldlib": "2.0.5",
+    "@concrnt/client": "2.0.6",
+    "@concrnt/worldlib": "2.0.6",
     "@js-temporal/polyfill": "0.5.1",
     "dotenv": "16.6.1",
     "openai": "7.23.0"

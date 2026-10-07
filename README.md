@@ -65,7 +65,7 @@ pm2のcron設定は不要です。複数インスタンス・clusterモードで
 
 ## 本人の特定・取得・投稿
 
-使用ライブラリは `@concrnt/client` / `@concrnt/worldlib` **2.0.5**。同梱ソースを確認しています。
+使用ライブラリは `@concrnt/client` / `@concrnt/worldlib` **2.0.6**。同梱ソースを確認しています。
 
 1. `new InMemoryAuthProvider(undefined, subkey)` → `getCCID()`。ライブラリ内部の `LoadSubKey()` が持ち主CCIDと署名鍵を読みます。対象ユーザーを別の環境変数で指定する経路はありません。
 2. `verifySession()` は `semantics.subkey(ccid, ckid)` を取得し、worldlibの `Client.checkSubkeyStatus()` と同じ `record` / `subkey.json` 判定で失効を検出します。鍵を持つApiから認証付きで読み取ります。登録が確認できない場合は続行しません。実際の操作権限はサーバーが判定します。

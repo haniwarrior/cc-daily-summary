@@ -50,7 +50,7 @@ export async function fetchPosts(config: { host: string; targetUser: string }, w
       try { doc = JSON.parse(item.document); }
       catch { throw new Error(`${pageNumber}ページ目に不正なJSONがあります。取得を中止しました。`); }
       if (doc?.kind !== 'record' || doc.author !== config.targetUser) continue;
-      // worldlib 2.0.5のschemasでreply.bodyは必須、reroute.bodyは任意。
+      // worldlib 2.0.6のschemasでreply.bodyは必須、reroute.bodyは任意。
       // 既存判定を維持し、本文付きrerouteをquoteとして扱う（参照先の本文は含めない）。
       const kind = doc.schema === Schemas.replyMessage ? 'reply'
         : doc.schema === Schemas.rerouteMessage ? 'quote' : ordinary.has(doc.schema) ? 'post' : undefined;

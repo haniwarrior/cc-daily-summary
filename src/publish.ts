@@ -42,7 +42,7 @@ export function summaryDocument(ccid: string, additional: readonly string[], tex
 }
 
 export async function prepareSummary(session: Session, doc: Document<{ body: string }>): Promise<string> {
-  // Api.commit() 2.0.5と同じ署名・reference形式を一度だけ作る。
+  // Api.commit() 2.0.6と同じ署名・reference形式を一度だけ作る。
   // SDK commitには生レスポンスのconsole出力があるため、準備と送信を分ける。
   const self = await session.api.getResource<SignedDocument>(semantics.user(session.ccid));
   const document = JSON.stringify(doc);

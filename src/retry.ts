@@ -6,7 +6,7 @@ export class HttpError extends Error {
 }
 
 function sdkHttpStatus(error: unknown): number | undefined {
-  // @concrnt/client 2.0.5 fetchWithCacheが型を付けずに投げる正確な書式。
+  // @concrnt/client 2.0.6 fetchWithCacheが型を付けずに投げる正確な書式。
   const match = error instanceof Error ? /^fetch failed on transport: (\d{3})\b/.exec(error.message) : null;
   return match ? Number(match[1]) : undefined;
 }
